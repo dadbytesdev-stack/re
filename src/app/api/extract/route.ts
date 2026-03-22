@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
 
     await incrementUsage(userId);
 
-    return NextResponse.json({ recipe: { ...recipe, id: saved.id } });
+    return NextResponse.json({ recipe: { ...recipe, id: saved.id, isSaved: saved.isSaved } });
   } catch (error) {
     console.error("[extract]", error);
     const message =

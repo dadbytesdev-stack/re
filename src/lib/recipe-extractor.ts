@@ -23,26 +23,58 @@ export interface ExtractedRecipe {
 // ─────────────────────────────────────────────
 // Step 1 — Fetch page HTML
 // ─────────────────────────────────────────────
+const BROWSER_HEADERS = {
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+  "Accept":
+    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+  "Accept-Language": "en-US,en;q=0.9",
+  "Accept-Encoding": "gzip, deflate, br",
+  "Cache-Control": "no-cache",
+  "Pragma": "no-cache",
+  "Upgrade-Insecure-Requests": "1",
+};
+
+function truncate(html: string) {
+  return html.length > 2_000_000 ? html.slice(0, 2_000_000) : html;
+}
+
 async function fetchHtml(url: string): Promise<string> {
-  const res = await fetch(url, {
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (compatible; RecipeExtractorBot/1.0; +https://recipeextractor.app)",
-      "Accept-Language": "en-US,en;q=0.9",
-    },
-    next: { revalidate: 0 },
-  });
+  // ── Attempt 1: direct fetch ──────────────────────────────────────────────
+  try {
+    const res = await fetch(url, {
+      headers: BROWSER_HEADERS,
+      redirect: "follow",
+      cache: "no-store",
+    });
 
-  if (!res.ok) {
-    throw new Error(`Failed to fetch URL: ${res.status} ${res.statusText}`);
+    if (res.ok) {
+      return truncate(await res.text());
+    }
+
+    // Only fall through to ScraperAPI on bot-block status codes
+    if (![402, 403, 429, 503].includes(res.status)) {
+      throw new Error(`Failed to fetch URL: ${res.status} ${res.statusText}`);
+    }
+  } catch (err) {
+    if ((err as Error).message.startsWith("Failed to fetch URL:")) throw err;
+    // Network/other error — try ScraperAPI
   }
 
-  const html = await res.text();
-  if (html.length > 2_000_000) {
-    // Truncate very large pages to keep token count manageable
-    return html.slice(0, 2_000_000);
+  // ── Attempt 2: ScraperAPI (bypasses Cloudflare & bot protection) ─────────
+  const apiKey = process.env.SCRAPER_API_KEY;
+  if (!apiKey) {
+    throw new Error("Unable to fetch this page. Add a SCRAPER_API_KEY to enable access to protected sites.");
   }
-  return html;
+
+  const scraperUrl = `http://api.scraperapi.com?api_key=${apiKey}&url=${encodeURIComponent(url)}&render=true`;
+  const scraperRes = await fetch(scraperUrl, { cache: "no-store" });
+
+  if (!scraperRes.ok) {
+    throw new Error(`Unable to fetch this recipe page (${scraperRes.status}). The site may be blocking access.`);
+  }
+
+  return truncate(await scraperRes.text());
 }
 
 // ─────────────────────────────────────────────

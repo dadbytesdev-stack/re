@@ -48,10 +48,15 @@ export async function POST(req: NextRequest) {
 }
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
+  console.log("[webhook] checkout.session.completed", { mode: session.mode, metadata: session.metadata });
+
   if (session.mode !== "subscription") return;
 
   const userId = session.metadata?.userId;
-  if (!userId) return;
+  if (!userId) {
+    console.error("[webhook] No userId in session metadata");
+    return;
+  }
 
   const subscription = await stripe.subscriptions.retrieve(
     session.subscription as string
@@ -59,6 +64,8 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
   const priceId = subscription.items.data[0]?.price.id;
   const tier = getTierFromPriceId(priceId);
+
+  console.log("[webhook] Updating user", { userId, priceId, tier });
 
   await prisma.$transaction([
     prisma.user.update({
@@ -82,6 +89,8 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       },
     }),
   ]);
+
+  console.log("[webhook] User tier updated to", tier);
 }
 
 async function handlePaymentSucceeded(invoice: Stripe.Invoice) {

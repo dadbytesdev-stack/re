@@ -2,6 +2,8 @@
 
 import Image from "next/image";
 import { useState } from "react";
+import { useSession } from "next-auth/react";
+import Link from "next/link";
 
 interface RecipeResultProps {
   recipe: {
@@ -14,11 +16,39 @@ interface RecipeResultProps {
     ingredients: string[];
     instructions: string[];
     sourceUrl: string;
+    isSaved?: boolean;
   };
+  onSaveChange?: () => void;
 }
 
-export function RecipeResult({ recipe }: RecipeResultProps) {
+export function RecipeResult({ recipe, onSaveChange }: RecipeResultProps) {
+  const { data: session } = useSession();
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
+  const [isSaved, setIsSaved] = useState(recipe.isSaved ?? false);
+  const [savingState, setSavingState] = useState<"idle" | "saving" | "error">("idle");
+
+  const tier = session?.user?.tier;
+  const canSave = tier === "PREMIUM" || tier === "PRO";
+
+  async function handleSave() {
+    if (!recipe.id) return;
+    setSavingState("saving");
+    try {
+      const res = await fetch(`/api/recipes/${recipe.id}`, { method: "PATCH" });
+      const data = await res.json();
+      if (res.ok) {
+        setIsSaved(data.isSaved);
+        setSavingState("idle");
+        onSaveChange?.();
+      } else {
+        setSavingState("error");
+        setTimeout(() => setSavingState("idle"), 3000);
+      }
+    } catch {
+      setSavingState("error");
+      setTimeout(() => setSavingState("idle"), 3000);
+    }
+  }
 
   function copyToClipboard(text: string, section: string) {
     navigator.clipboard.writeText(text).then(() => {
@@ -49,7 +79,42 @@ export function RecipeResult({ recipe }: RecipeResultProps) {
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <h2 className="text-xl font-bold text-gray-900 leading-snug">{recipe.title}</h2>
+            <div className="flex items-start justify-between gap-3">
+              <h2 className="text-xl font-bold text-gray-900 leading-snug">{recipe.title}</h2>
+
+              {/* Save button */}
+              {recipe.id && session?.user && (
+                canSave ? (
+                  <button
+                    onClick={handleSave}
+                    disabled={savingState === "saving"}
+                    title={isSaved ? "Remove from saved" : "Save recipe"}
+                    className={`flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${
+                      isSaved
+                        ? "bg-brand-100 text-brand-700 hover:bg-red-50 hover:text-red-600"
+                        : "bg-gray-100 text-gray-600 hover:bg-brand-50 hover:text-brand-600"
+                    }`}
+                  >
+                    {savingState === "saving" ? (
+                      "Saving…"
+                    ) : isSaved ? (
+                      <><span>✓</span> Saved</>
+                    ) : (
+                      <><span>🔖</span> Save</>
+                    )}
+                  </button>
+                ) : (
+                  <Link
+                    href="/pricing"
+                    className="flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg bg-gray-100 text-gray-500 hover:bg-brand-50 hover:text-brand-600 transition-colors whitespace-nowrap"
+                    title="Upgrade to save recipes"
+                  >
+                    🔒 Save
+                  </Link>
+                )
+              )}
+            </div>
+
             <a
               href={recipe.sourceUrl}
               target="_blank"

@@ -28,6 +28,9 @@ export function Header() {
               <Link href="/dashboard" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
                 Dashboard
               </Link>
+              <Link href="/recipes" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
+                My Recipes
+              </Link>
               <div className="relative">
                 <button
                   onClick={() => setMenuOpen(!menuOpen)}
@@ -48,6 +51,13 @@ export function Header() {
                       onClick={() => setMenuOpen(false)}
                     >
                       Dashboard
+                    </Link>
+                    <Link
+                      href="/recipes"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      My Recipes
                     </Link>
                     <Link
                       href="/pricing"
@@ -104,6 +114,9 @@ export function Header() {
             <>
               <Link href="/dashboard" className="block py-2 text-sm font-medium text-gray-700" onClick={() => setMenuOpen(false)}>
                 Dashboard
+              </Link>
+              <Link href="/recipes" className="block py-2 text-sm font-medium text-gray-700" onClick={() => setMenuOpen(false)}>
+                My Recipes
               </Link>
               <button onClick={() => signOut({ callbackUrl: "/" })} className="block w-full text-left py-2 text-sm text-red-600">
                 Sign out

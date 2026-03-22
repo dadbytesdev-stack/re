@@ -28,10 +28,20 @@ interface UsageData {
 }
 
 function DashboardContent() {
-  const { data: session, status } = useSession();
+  const { data: session, status, update } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
   const justUpgraded = searchParams.get("success") === "true";
+
+  // Force session refresh when returning from Stripe checkout, then clean up URL
+  useEffect(() => {
+    if (justUpgraded) {
+      update().then(() => {
+        router.replace("/dashboard", { scroll: false });
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [recipes, setRecipes] = useState<SavedRecipe[]>([]);
   const [usage, setUsage] = useState<UsageData | null>(null);
@@ -56,7 +66,7 @@ function DashboardContent() {
 
   const fetchRecipes = useCallback(async (p: number) => {
     setLoadingRecipes(true);
-    const res = await fetch(`/api/recipes?page=${p}&limit=12`);
+    const res = await fetch(`/api/recipes?type=saved&page=${p}&limit=5`);
     if (res.ok) {
       const data = await res.json();
       setRecipes(data.recipes);
@@ -145,15 +155,17 @@ function DashboardContent() {
             {/* Extractor */}
             <div className="card space-y-4">
               <h2 className="font-bold text-gray-900">Extract a Recipe</h2>
-              <RecipeExtractor />
+              <RecipeExtractor onSaveChange={() => fetchRecipes(1)} />
             </div>
 
             {/* Saved Recipes */}
             {canSave && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h2 className="font-bold text-gray-900">Saved Recipes</h2>
-                  <span className="text-xs text-gray-400">{recipes.length} saved</span>
+                  <h2 className="font-bold text-gray-900">Recently Saved</h2>
+                  <Link href="/recipes" className="text-xs text-brand-500 font-semibold hover:underline">
+                    View all →
+                  </Link>
                 </div>
 
                 {loadingRecipes ? (
@@ -170,7 +182,7 @@ function DashboardContent() {
                 ) : (
                   <>
                     <div className="grid sm:grid-cols-2 gap-4">
-                      {recipes.map((recipe) => (
+                      {recipes.slice(0, 5).map((recipe) => (
                         <RecipeCard
                           key={recipe.id}
                           recipe={recipe}
@@ -178,29 +190,9 @@ function DashboardContent() {
                         />
                       ))}
                     </div>
-
-                    {/* Pagination */}
-                    {totalPages > 1 && (
-                      <div className="flex justify-center gap-2 mt-4">
-                        <button
-                          disabled={page === 1}
-                          onClick={() => setPage((p) => p - 1)}
-                          className="btn-secondary text-xs disabled:opacity-40"
-                        >
-                          Previous
-                        </button>
-                        <span className="text-xs text-gray-500 self-center">
-                          Page {page} of {totalPages}
-                        </span>
-                        <button
-                          disabled={page === totalPages}
-                          onClick={() => setPage((p) => p + 1)}
-                          className="btn-secondary text-xs disabled:opacity-40"
-                        >
-                          Next
-                        </button>
-                      </div>
-                    )}
+                    <Link href="/recipes" className="block text-center text-xs text-brand-500 font-semibold hover:underline mt-2">
+                      View all saved recipes & history →
+                    </Link>
                   </>
                 )}
               </div>

@@ -15,13 +15,15 @@ interface ExtractedRecipe {
   ingredients: string[];
   instructions: string[];
   sourceUrl: string;
+  isSaved?: boolean;
 }
 
 interface ExtractorProps {
   initialUrl?: string;
+  onSaveChange?: () => void;
 }
 
-export function RecipeExtractor({ initialUrl = "" }: ExtractorProps) {
+export function RecipeExtractor({ initialUrl = "", onSaveChange }: ExtractorProps) {
   const { data: session } = useSession();
   const router = useRouter();
 
@@ -30,6 +32,7 @@ export function RecipeExtractor({ initialUrl = "" }: ExtractorProps) {
   const [error, setError] = useState<string | null>(null);
   const [recipe, setRecipe] = useState<ExtractedRecipe | null>(null);
   const [requiresSignup, setRequiresSignup] = useState(false);
+  const [isLimitError, setIsLimitError] = useState(false);
 
   async function handleExtract(e: React.FormEvent) {
     e.preventDefault();
@@ -39,6 +42,7 @@ export function RecipeExtractor({ initialUrl = "" }: ExtractorProps) {
     setError(null);
     setRecipe(null);
     setRequiresSignup(false);
+    setIsLimitError(false);
 
     try {
       const res = await fetch("/api/extract", {
@@ -52,10 +56,12 @@ export function RecipeExtractor({ initialUrl = "" }: ExtractorProps) {
       if (!res.ok) {
         if (data.requiresSignup) {
           setRequiresSignup(true);
+          setIsLimitError(true);
           setError(data.message ?? "Please sign up to continue.");
           return;
         }
         if (res.status === 403 && data.tier) {
+          setIsLimitError(true);
           setError(data.message ?? "Monthly limit reached.");
           return;
         }
@@ -125,7 +131,7 @@ export function RecipeExtractor({ initialUrl = "" }: ExtractorProps) {
               </button>
             </div>
           )}
-          {!requiresSignup && !session && (
+          {!requiresSignup && isLimitError && (
             <p className="mt-1 text-gray-500">
               <a href="/pricing" className="underline hover:text-gray-700">View plans</a> to unlock more extractions.
             </p>
@@ -147,7 +153,7 @@ export function RecipeExtractor({ initialUrl = "" }: ExtractorProps) {
       )}
 
       {/* Recipe Result */}
-      {recipe && !loading && <RecipeResult recipe={recipe} />}
+      {recipe && !loading && <RecipeResult recipe={recipe} onSaveChange={onSaveChange} />}
     </div>
   );
 }
