@@ -7,6 +7,7 @@
  */
 
 import * as cheerio from "cheerio";
+import type { Element as DomElement } from "domhandler";
 import OpenAI from "openai";
 
 export interface ExtractedRecipe {
@@ -100,7 +101,7 @@ function parseJsonLd(html: string): ExtractedRecipe | null {
 
   let recipeSchema: SchemaRecipe | null = null;
 
-  scripts.each((_: number, el: cheerio.Element) => {
+  scripts.each((_: number, el: DomElement) => {
     try {
       const json = JSON.parse($(el).html() || "{}");
       const candidates: SchemaRecipe[] = Array.isArray(json)
