@@ -1,0 +1,137 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Auth (NextAuth adapter tables)
+// ─────────────────────────────────────────────────────────────
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Users
+// ─────────────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?   // hashed with bcryptjs
+
+  // Subscription
+  tier              Tier     @default(FREE)
+  stripeCustomerId  String?  @unique
+  stripeSubId       String?  @unique
+
+  // Usage tracking (resets monthly)
+  extractionsUsed   Int      @default(0)
+  usageResetAt      DateTime @default(now())
+
+  accounts     Account[]
+  sessions     Session[]
+  recipes      Recipe[]
+  subscription Subscription?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum Tier {
+  FREE
+  PREMIUM
+  PRO
+}
+
+// ─────────────────────────────────────────────────────────────
+// Subscriptions
+// ─────────────────────────────────────────────────────────────
+
+model Subscription {
+  id                   String             @id @default(cuid())
+  userId               String             @unique
+  stripeSubscriptionId String             @unique
+  stripePriceId        String
+  stripeCurrentPeriodEnd DateTime
+  status               SubscriptionStatus @default(ACTIVE)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  PAST_DUE
+  INCOMPLETE
+}
+
+// ─────────────────────────────────────────────────────────────
+// Recipes
+// ─────────────────────────────────────────────────────────────
+
+model Recipe {
+  id          String   @id @default(cuid())
+  userId      String?  // null = guest extraction (not saved)
+  title       String
+  sourceUrl   String
+  image       String?
+  prepTime    String?
+  cookTime    String?
+  servings    String?
+  ingredients Json     // string[]
+  instructions Json    // string[]
+  isSaved     Boolean  @default(false)
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([sourceUrl])
+}
