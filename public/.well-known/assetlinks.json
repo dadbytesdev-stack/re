@@ -3,7 +3,7 @@
     "relation": ["delegate_permission/common.handle_all_urls"],
     "target": {
       "namespace": "android_app",
-      "package_name": "com.recipeextractor.app",
+      "package_name": "app.vercel.re_flax.twa",
       "sha256_cert_fingerprints": [
         "E5:C9:9C:28:67:01:44:96:CB:17:CF:FB:62:52:8C:38:CC:71:9C:49:25:2F:67:62:BF:1B:53:43:DF:8C:93:01"
       ]
