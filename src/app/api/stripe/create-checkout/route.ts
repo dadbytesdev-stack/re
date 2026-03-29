@@ -56,6 +56,7 @@ export async function POST(req: NextRequest) {
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${appUrl}/dashboard?success=true`,
       cancel_url: `${appUrl}/pricing?canceled=true`,
+      allow_promotion_codes: true,
       metadata: { userId: session.user.id },
       subscription_data: {
         metadata: { userId: session.user.id },
