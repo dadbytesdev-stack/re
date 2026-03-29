@@ -62,20 +62,30 @@ async function fetchHtml(url: string): Promise<string> {
     // Network/other error — try ScraperAPI
   }
 
-  // ── Attempt 2: ScraperAPI (bypasses Cloudflare & bot protection) ─────────
+  // ── Attempt 2: ScraperAPI without JS rendering (fast, ~3-5s) ─────────────
   const apiKey = process.env.SCRAPER_API_KEY;
   if (!apiKey) {
     throw new Error("Unable to fetch this page. Add a SCRAPER_API_KEY to enable access to protected sites.");
   }
 
-  const scraperUrl = `http://api.scraperapi.com?api_key=${apiKey}&url=${encodeURIComponent(url)}&render=true`;
-  const scraperRes = await fetch(scraperUrl, { cache: "no-store" });
+  const scraperUrlFast = `http://api.scraperapi.com?api_key=${apiKey}&url=${encodeURIComponent(url)}`;
+  const scraperResFast = await fetch(scraperUrlFast, { cache: "no-store" });
 
-  if (!scraperRes.ok) {
-    throw new Error(`Unable to fetch this recipe page (${scraperRes.status}). The site may be blocking access.`);
+  if (scraperResFast.ok) {
+    const html = truncate(await scraperResFast.text());
+    // Only accept if it has actual recipe content (not a JS-gated blank page)
+    if (html.length > 5000) return html;
   }
 
-  return truncate(await scraperRes.text());
+  // ── Attempt 3: ScraperAPI with JS rendering (slow, ~15-25s) ──────────────
+  const scraperUrlRender = `http://api.scraperapi.com?api_key=${apiKey}&url=${encodeURIComponent(url)}&render=true`;
+  const scraperResRender = await fetch(scraperUrlRender, { cache: "no-store" });
+
+  if (!scraperResRender.ok) {
+    throw new Error(`Unable to fetch this recipe page (${scraperResRender.status}). The site may be blocking access.`);
+  }
+
+  return truncate(await scraperResRender.text());
 }
 
 // ─────────────────────────────────────────────
