@@ -65,6 +65,10 @@ model User {
   tier              Tier     @default(FREE)
   stripeCustomerId  String?  @unique
   stripeSubId       String?  @unique
+  // Apple In-App Purchase: the original transaction id from the first
+  // purchase in a subscription group. Stable across renewals, so we use it
+  // as the link between an App Store Server Notification and a user.
+  appleOriginalTransactionId String? @unique
 
   // Usage tracking (resets monthly)
   extractionsUsed   Int      @default(0)
