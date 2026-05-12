@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getAuthUser } from "@/lib/mobile-auth";
 
 // GET /api/recipes?type=saved|history&page=1&limit=10
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const user = await getAuthUser(req);
 
-  if (!session?.user) {
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -21,8 +20,8 @@ export async function GET(req: NextRequest) {
   // Saved = only isSaved: true
   const where =
     type === "history"
-      ? { userId: session.user.id }
-      : { userId: session.user.id, isSaved: true };
+      ? { userId: user.id }
+      : { userId: user.id, isSaved: true };
 
   const [recipes, total] = await Promise.all([
     prisma.recipe.findMany({

@@ -1,23 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getAuthUser } from "@/lib/mobile-auth";
 
 // GET /api/recipes/:id
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getServerSession(authOptions);
+  const user = await getAuthUser(req);
   const { id } = await params;
 
-  if (!session?.user) {
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const recipe = await prisma.recipe.findUnique({ where: { id } });
 
-  if (!recipe || recipe.userId !== session.user.id) {
+  if (!recipe || recipe.userId !== user.id) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
@@ -26,18 +25,17 @@ export async function GET(
 
 // PATCH /api/recipes/:id — toggle isSaved
 export async function PATCH(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getServerSession(authOptions);
+  const user = await getAuthUser(req);
   const { id } = await params;
 
-  if (!session?.user) {
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const tier = session.user.tier;
-  if (tier === "FREE") {
+  if (user.tier === "FREE") {
     return NextResponse.json(
       { error: "Upgrade to Premium to save recipes." },
       { status: 403 }
@@ -46,7 +44,7 @@ export async function PATCH(
 
   const recipe = await prisma.recipe.findUnique({ where: { id } });
 
-  if (!recipe || recipe.userId !== session.user.id) {
+  if (!recipe || recipe.userId !== user.id) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
@@ -60,19 +58,19 @@ export async function PATCH(
 
 // DELETE /api/recipes/:id
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getServerSession(authOptions);
+  const user = await getAuthUser(req);
   const { id } = await params;
 
-  if (!session?.user) {
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const recipe = await prisma.recipe.findUnique({ where: { id } });
 
-  if (!recipe || recipe.userId !== session.user.id) {
+  if (!recipe || recipe.userId !== user.id) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 

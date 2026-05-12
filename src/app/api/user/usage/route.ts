@@ -1,15 +1,14 @@
-import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
 import { canExtract } from "@/lib/usage";
+import { getAuthUser } from "@/lib/mobile-auth";
 
-export async function GET() {
-  const session = await getServerSession(authOptions);
+export async function GET(req: NextRequest) {
+  const user = await getAuthUser(req);
 
-  if (!session?.user) {
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const usage = await canExtract(session.user.id);
+  const usage = await canExtract(user.id);
   return NextResponse.json(usage);
 }

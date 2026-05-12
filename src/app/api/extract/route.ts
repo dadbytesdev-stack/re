@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { extractRecipe } from "@/lib/recipe-extractor";
 import { canExtract, incrementUsage } from "@/lib/usage";
 import { prisma } from "@/lib/prisma";
+import { getAuthUser } from "@/lib/mobile-auth";
 import { z } from "zod";
 
 const extractSchema = z.object({
@@ -26,10 +25,10 @@ export async function POST(req: NextRequest) {
     }
 
     const { url } = result.data;
-    const session = await getServerSession(authOptions);
+    const authUser = await getAuthUser(req);
 
     // ── Guest (unauthenticated) ────────────────────────────────────────────
-    if (!session?.user) {
+    if (!authUser) {
       const ip =
         req.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "unknown";
       const uses = guestUsage.get(ip) ?? 0;
@@ -53,7 +52,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Authenticated user ─────────────────────────────────────────────────
-    const userId = session.user.id;
+    const userId = authUser.id;
     const { allowed, used, limit, tier } = await canExtract(userId);
 
     if (!allowed) {
