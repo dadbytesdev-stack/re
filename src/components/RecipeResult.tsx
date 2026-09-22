@@ -3,7 +3,6 @@
 import Image from "next/image";
 import { useState } from "react";
 import { useSession } from "next-auth/react";
-import Link from "next/link";
 
 interface RecipeResultProps {
   recipe: {
@@ -27,8 +26,8 @@ export function RecipeResult({ recipe, onSaveChange }: RecipeResultProps) {
   const [isSaved, setIsSaved] = useState(recipe.isSaved ?? false);
   const [savingState, setSavingState] = useState<"idle" | "saving" | "error">("idle");
 
-  const tier = session?.user?.tier;
-  const canSave = tier === "PREMIUM" || tier === "PRO";
+  // Saving is included on every plan now — being signed in is enough.
+  const canSave = Boolean(session?.user);
 
   async function handleSave() {
     if (!recipe.id) return;
@@ -83,35 +82,25 @@ export function RecipeResult({ recipe, onSaveChange }: RecipeResultProps) {
               <h2 className="text-xl font-bold text-gray-900 leading-snug">{recipe.title}</h2>
 
               {/* Save button */}
-              {recipe.id && session?.user && (
-                canSave ? (
-                  <button
-                    onClick={handleSave}
-                    disabled={savingState === "saving"}
-                    title={isSaved ? "Remove from saved" : "Save recipe"}
-                    className={`flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${
-                      isSaved
-                        ? "bg-brand-100 text-brand-700 hover:bg-red-50 hover:text-red-600"
-                        : "bg-gray-100 text-gray-600 hover:bg-brand-50 hover:text-brand-600"
-                    }`}
-                  >
-                    {savingState === "saving" ? (
-                      "Saving…"
-                    ) : isSaved ? (
-                      <><span>✓</span> Saved</>
-                    ) : (
-                      <><span>🔖</span> Save</>
+              {recipe.id && canSave && (
+                <button
+                  onClick={handleSave}
+                  disabled={savingState === "saving"}
+                  title={isSaved ? "Remove from saved" : "Save recipe"}
+                  className={`flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${
+                    isSaved
+                      ? "bg-brand-100 text-brand-700 hover:bg-red-50 hover:text-red-600"
+                      : "bg-gray-100 text-gray-600 hover:bg-brand-50 hover:text-brand-600"
+                  }`}
+                >
+                  {savingState === "saving" ? (
+                    "Saving…"
+                  ) : isSaved ? (
+                    <><span>✓</span> Saved</>
+                  ) : (
+                    <><span>🔖</span> Save</>
                     )}
-                  </button>
-                ) : (
-                  <Link
-                    href="/pricing"
-                    className="flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg bg-gray-100 text-gray-500 hover:bg-brand-50 hover:text-brand-600 transition-colors whitespace-nowrap"
-                    title="Upgrade to save recipes"
-                  >
-                    🔒 Save
-                  </Link>
-                )
+                </button>
               )}
             </div>
 

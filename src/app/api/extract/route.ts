@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { extractRecipe } from "@/lib/recipe-extractor";
-import { canExtract, incrementUsage } from "@/lib/usage";
+import { canExtract, incrementUsage, GUEST_LIMIT, TIER_LIMITS } from "@/lib/usage";
 import { prisma } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/mobile-auth";
 import { z } from "zod";
@@ -33,13 +33,13 @@ export async function POST(req: NextRequest) {
         req.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "unknown";
       const uses = guestUsage.get(ip) ?? 0;
 
-      if (uses >= 1) {
+      if (uses >= GUEST_LIMIT) {
         return NextResponse.json(
           {
             error: "Guest limit reached",
             requiresSignup: true,
             message:
-              "You've used your 1 free extraction. Sign up for more!",
+              `You've used your ${GUEST_LIMIT} free extraction. Sign in for ${TIER_LIMITS.FREE} more free extractions a month — and save your recipes so you don't lose them.`,
           },
           { status: 403 }
         );
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
           tier,
           message:
             tier === "FREE"
-              ? "Upgrade to Premium for 10 extractions/month."
+              ? `Upgrade to Premium for ${TIER_LIMITS.PREMIUM} extractions/month.`
               : "Upgrade to Pro for unlimited extractions.",
         },
         { status: 403 }
@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
         servings: recipe.servings,
         ingredients: recipe.ingredients,
         instructions: recipe.instructions,
-        isSaved: tier !== "FREE",
+        isSaved: tier !== "FREE", // paid tiers auto-save; Free saves with the button
       },
     });
 

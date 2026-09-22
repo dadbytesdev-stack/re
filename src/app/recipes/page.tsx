@@ -86,7 +86,8 @@ export default function RecipesPage() {
     }
   }
 
-  const canSave = session?.user?.tier === "PREMIUM" || session?.user?.tier === "PRO";
+  // Saving is included on every plan now — this page already requires a session.
+  const canSave = Boolean(session?.user);
 
   if (status === "loading" || status === "unauthenticated") {
     return (
@@ -133,18 +134,6 @@ export default function RecipesPage() {
             </button>
           ))}
         </div>
-
-        {/* Upgrade prompt for free users on saved tab */}
-        {tab === "saved" && !canSave && (
-          <div className="card bg-brand-50 border-brand-200 text-center space-y-2 py-8">
-            <p className="text-2xl">🔒</p>
-            <p className="font-semibold text-brand-800">Save recipes with Premium</p>
-            <p className="text-sm text-brand-700">Upgrade to save and revisit your favourite extractions.</p>
-            <Link href="/pricing" className="btn-primary text-sm inline-block mt-2">
-              View plans
-            </Link>
-          </div>
-        )}
 
         {/* Recipe list */}
         {(tab === "history" || canSave) && (

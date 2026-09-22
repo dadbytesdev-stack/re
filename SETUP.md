@@ -63,17 +63,18 @@ Open [http://localhost:3000](http://localhost:3000).
 | `STRIPE_SECRET_KEY` | Your Stripe secret key (sk_test_...) |
 | `STRIPE_PUBLISHABLE_KEY` | Your Stripe publishable key (pk_test_...) |
 | `STRIPE_WEBHOOK_SECRET` | From `stripe listen --forward-to localhost:3000/api/stripe/webhook` |
-| `STRIPE_PREMIUM_MONTHLY_PRICE_ID` | Price ID for Premium plan |
-| `STRIPE_PRO_MONTHLY_PRICE_ID` | Price ID for Pro monthly plan |
-| `STRIPE_PRO_YEARLY_PRICE_ID` | Price ID for Pro yearly plan |
+| `STRIPE_PREMIUM_MONTHLY_PRICE_ID` | Price ID for Premium plan ($2.99/mo) |
+| `STRIPE_PRO_MONTHLY_PRICE_ID` | Price ID for Pro monthly plan ($9.99/mo) |
+| `STRIPE_LIFETIME_PRICE_ID` | Price ID for the one-time Lifetime purchase ($50) |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Same as publishable key (exposed to client) |
 | `NEXT_PUBLIC_APP_URL` | `http://localhost:3000` for local dev |
 
 ### Setting up Stripe
 1. Create a [Stripe account](https://stripe.com)
-2. In the Stripe dashboard → Products, create two products:
-   - **Premium** — $4.99/month recurring → copy the Price ID
-   - **Pro** — $9.99/month + optional $99/year → copy the Price IDs
+2. In the Stripe dashboard → Products, create three products:
+   - **Premium** — $2.99/month recurring → copy the Price ID
+   - **Pro** — $9.99/month recurring → copy the Price ID
+   - **Lifetime** — $50 **one-time** (not recurring) → copy the Price ID
 3. Paste the Price IDs into `.env.local`
 4. For webhooks locally, install the Stripe CLI and run:
    ```bash
@@ -126,12 +127,16 @@ prisma/
 
 ## Access Tiers
 
-| Feature | Free | Premium | Pro |
-|---|---|---|---|
-| Extractions/month | 1 (guest) | 10 | Unlimited |
-| Save history | ✗ | ✓ | ✓ |
-| Saved recipe limit | — | Unlimited | Unlimited |
-| Price | $0 | $4.99/mo | $9.99/mo |
+| Feature | Guest | Free | Premium | Pro | Lifetime |
+|---|---|---|---|---|---|
+| Extractions/month | 1 total | 10 | 20 | Unlimited | Unlimited |
+| Save recipes | ✗ | ✓ | ✓ | ✓ | ✓ |
+| Saved recipe limit | — | Unlimited | Unlimited | Unlimited | Unlimited |
+| Price | $0 | $0 | $2.99/mo | $9.99/mo | $50 once |
+
+Guests get 1 extraction with no account, then get pushed to sign in for 10 free
+a month. Saving is included on every signed-in plan; paid tiers raise the
+monthly extraction quota.
 
 ---
 

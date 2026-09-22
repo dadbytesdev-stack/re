@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { useSession } from "next-auth/react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { getSession, useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Header } from "@/components/Header";
 import { RecipeExtractor } from "@/components/RecipeExtractor";
@@ -23,9 +23,23 @@ interface SavedRecipe {
 
 interface UsageData {
   used: number;
-  limit: number;
-  tier: "FREE" | "PREMIUM" | "PRO";
+  /** null means unlimited — see /api/user/usage. */
+  limit: number | null;
+  tier: "FREE" | "PREMIUM" | "PRO" | "LIFETIME";
 }
+
+type UpgradeState = "idle" | "activating" | "done" | "slow";
+
+const TIER_LABELS: Record<UsageData["tier"], string> = {
+  FREE: "Free",
+  PREMIUM: "Premium",
+  PRO: "Pro",
+  LIFETIME: "Lifetime",
+};
+
+/** Roughly 18s of polling — long enough for a slow webhook, short enough to bail. */
+const UPGRADE_POLL_ATTEMPTS = 12;
+const UPGRADE_POLL_INTERVAL_MS = 1500;
 
 function DashboardContent() {
   const { data: session, status, update } = useSession();
@@ -33,16 +47,15 @@ function DashboardContent() {
   const searchParams = useSearchParams();
   const justUpgraded = searchParams.get("success") === "true";
 
-  // Force session refresh when returning from Stripe checkout, then clean up URL
-  useEffect(() => {
-    if (justUpgraded) {
-      update().then(() => {
-        router.replace("/dashboard", { scroll: false });
-      });
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  /* NextAuth's `update` bails out early when it closes over a session that was
+   * still null, so the poll below must always call the current render's copy
+   * rather than the one captured when the effect mounted. */
+  const updateRef = useRef(update);
+  updateRef.current = update;
 
+  const [upgradeState, setUpgradeState] = useState<UpgradeState>(
+    justUpgraded ? "activating" : "idle"
+  );
   const [recipes, setRecipes] = useState<SavedRecipe[]>([]);
   const [usage, setUsage] = useState<UsageData | null>(null);
   const [loadingRecipes, setLoadingRecipes] = useState(true);
@@ -82,6 +95,53 @@ function DashboardContent() {
     }
   }, [status, page, fetchUsage, fetchRecipes]);
 
+  /* Stripe redirects here the moment payment completes, which can beat the
+   * webhook that actually applies the new tier. Refreshing the session once
+   * would often read a tier that is still FREE, so poll until it lands. */
+  useEffect(() => {
+    if (!justUpgraded) return;
+
+    let cancelled = false;
+
+    async function settle() {
+      setUpgradeState("done");
+      await fetchUsage();
+      router.replace("/dashboard", { scroll: false });
+    }
+
+    (async () => {
+      for (let attempt = 0; attempt <= UPGRADE_POLL_ATTEMPTS; attempt++) {
+        if (attempt > 0) {
+          await new Promise((r) => setTimeout(r, UPGRADE_POLL_INTERVAL_MS));
+          if (cancelled) return;
+        }
+
+        // getSession() always hits /api/auth/session, which re-reads the tier
+        // from the database via the jwt callback.
+        const refreshed = await getSession();
+        if (cancelled) return;
+
+        const tier = refreshed?.user?.tier;
+        // A paid tier means the webhook has been applied. On the first pass a
+        // tier that is already paid means there was never anything to wait for.
+        if (tier && tier !== "FREE") {
+          // Sync the provider so the rest of the page re-renders on the new tier.
+          await updateRef.current();
+          if (cancelled) return;
+          await settle();
+          return;
+        }
+      }
+
+      if (!cancelled) setUpgradeState("slow");
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function handleDeleteRecipe(id: string) {
     if (!confirm("Delete this recipe?")) return;
     const res = await fetch(`/api/recipes/${id}`, { method: "DELETE" });
@@ -100,17 +160,33 @@ function DashboardContent() {
   }
 
   const tier = session!.user.tier;
-  const canSave = tier === "PREMIUM" || tier === "PRO";
+  // Saving is included on every plan now — signing in is the only requirement.
+  const canSave = true;
 
   return (
     <>
       <Header />
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10 space-y-10">
 
-        {/* Upgrade success banner */}
-        {justUpgraded && (
+        {/* Post-checkout activation banner */}
+        {upgradeState === "activating" && (
+          <div className="bg-brand-50 border border-brand-200 rounded-xl p-4 text-sm text-brand-800 font-medium flex items-center gap-3">
+            <span className="animate-spin w-4 h-4 border-2 border-brand-500 border-t-transparent rounded-full shrink-0" />
+            Payment received — activating your plan…
+          </div>
+        )}
+        {upgradeState === "done" && (
           <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-sm text-green-800 font-medium">
-            🎉 Your plan has been upgraded! Enjoy your new features.
+            🎉 You&apos;re on {TIER_LABELS[tier]}! Enjoy your new features.
+          </div>
+        )}
+        {upgradeState === "slow" && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+            <p className="font-medium">Payment received — your plan is taking a moment to activate.</p>
+            <p className="mt-1">
+              This usually clears on its own within a minute. Refresh the page, and if it
+              still hasn&apos;t applied, get in touch and we&apos;ll sort it out.
+            </p>
           </div>
         )}
 
@@ -127,7 +203,7 @@ function DashboardContent() {
               <div className="card bg-gradient-to-br from-brand-50 to-amber-50 border-brand-200 space-y-3">
                 <p className="font-semibold text-brand-800 text-sm">Unlock more extractions</p>
                 <p className="text-xs text-brand-700">
-                  Upgrade to Premium for 10/month or Pro for unlimited access.
+                  Upgrade to Premium for 20/month, or go unlimited with Pro or Lifetime.
                 </p>
                 <Link href="/pricing" className="btn-primary text-xs w-full text-center">
                   View plans

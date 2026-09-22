@@ -35,13 +35,6 @@ export async function PATCH(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (user.tier === "FREE") {
-    return NextResponse.json(
-      { error: "Upgrade to Premium to save recipes." },
-      { status: 403 }
-    );
-  }
-
   const recipe = await prisma.recipe.findUnique({ where: { id } });
 
   if (!recipe || recipe.userId !== user.id) {
