@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { stripe } from "@/lib/stripe";
+import { stripe, LIFETIME_PRICE_IDS } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 
@@ -49,18 +49,21 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Lifetime is a one-time payment; every other plan is a subscription.
+    const isLifetime = LIFETIME_PRICE_IDS.includes(priceId);
+
     const checkoutSession = await stripe.checkout.sessions.create({
       customer: customerId,
-      mode: "subscription",
+      mode: isLifetime ? "payment" : "subscription",
       payment_method_types: ["card"],
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${appUrl}/dashboard?success=true`,
       cancel_url: `${appUrl}/pricing?canceled=true`,
       allow_promotion_codes: true,
       metadata: { userId: session.user.id },
-      subscription_data: {
-        metadata: { userId: session.user.id },
-      },
+      ...(isLifetime
+        ? { payment_intent_data: { metadata: { userId: session.user.id } } }
+        : { subscription_data: { metadata: { userId: session.user.id } } }),
     });
 
     return NextResponse.json({ url: checkoutSession.url });

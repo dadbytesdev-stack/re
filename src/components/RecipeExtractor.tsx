@@ -116,12 +116,17 @@ export function RecipeExtractor({ initialUrl = "", onSaveChange }: ExtractorProp
             {error}
           </p>
           {requiresSignup && (
+            <p className="mt-1 text-sm text-brand-700">
+              Make sure you sign in to save! Don&apos;t lose your recipes!
+            </p>
+          )}
+          {requiresSignup && (
             <div className="mt-3 flex gap-2">
               <button
                 onClick={() => router.push("/signup")}
                 className="btn-primary text-xs"
               >
-                Sign up free
+                Sign up free — 10 extractions/month
               </button>
               <button
                 onClick={() => router.push("/login")}

@@ -74,7 +74,7 @@ export default function SignupPage() {
           </Link>
           <h1 className="mt-4 text-xl font-bold text-gray-900">Create your account</h1>
           <p className="text-sm text-gray-500 mt-1">
-            1 free extraction — no credit card required
+            10 free extractions a month — no credit card required
           </p>
         </div>
 

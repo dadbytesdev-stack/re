@@ -4,7 +4,8 @@ import { Tier } from "@prisma/client";
 
 interface UsageCounterProps {
   used: number;
-  limit: number;
+  /** null means unlimited — Infinity cannot survive JSON. */
+  limit: number | null;
   tier: Tier;
 }
 
@@ -12,16 +13,18 @@ const TIER_LABELS: Record<Tier, string> = {
   FREE: "Free",
   PREMIUM: "Premium",
   PRO: "Pro",
+  LIFETIME: "Lifetime",
 };
 
 const TIER_COLORS: Record<Tier, string> = {
   FREE: "bg-gray-100 text-gray-600",
   PREMIUM: "bg-amber-50 text-amber-700",
   PRO: "bg-purple-50 text-purple-700",
+  LIFETIME: "bg-emerald-50 text-emerald-700",
 };
 
 export function UsageCounter({ used, limit, tier }: UsageCounterProps) {
-  const isUnlimited = limit === Infinity || limit > 999;
+  const isUnlimited = limit === null || !Number.isFinite(limit) || limit > 999;
   const pct = isUnlimited ? 100 : Math.min(100, Math.round((used / limit) * 100));
   const remaining = isUnlimited ? "∞" : limit - used;
 
@@ -42,7 +45,9 @@ export function UsageCounter({ used, limit, tier }: UsageCounterProps) {
       </div>
 
       {isUnlimited ? (
-        <p className="text-sm text-gray-500">Unlimited extractions on your Pro plan.</p>
+        <p className="text-sm text-gray-500">
+          Unlimited extractions on your {TIER_LABELS[tier]} plan.
+        </p>
       ) : (
         <>
           <div className="flex items-end justify-between">

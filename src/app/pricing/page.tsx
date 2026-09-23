@@ -7,11 +7,23 @@ import { Header } from "@/components/Header";
 import { PLANS } from "@/lib/stripe";
 import Link from "next/link";
 
+function Features({ items, tone }: { items: readonly string[]; tone: "light" | "dark" }) {
+  return (
+    <ul className="space-y-2 flex-1">
+      {items.map((f) => (
+        <li key={f} className="flex items-start gap-2 text-sm">
+          <span className={tone === "dark" ? "text-brand-200" : "text-brand-500"}>✓</span>
+          <span className={tone === "dark" ? "text-brand-50" : "text-gray-600"}>{f}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export default function PricingPage() {
   const { data: session } = useSession();
   const router = useRouter();
   const [loadingPriceId, setLoadingPriceId] = useState<string | null>(null);
-  const [proYearly, setProYearly] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   async function handleUpgrade(priceId: string) {
@@ -43,13 +55,13 @@ export default function PricingPage() {
   }
 
   const currentTier = session?.user?.tier ?? "FREE";
-  const proActivePriceId = proYearly ? PLANS.PRO.priceYearlyId : PLANS.PRO.priceId;
+  const signedIn = Boolean(session?.user);
 
   return (
     <>
       <Header />
       <main className="min-h-screen bg-gray-50 py-16 px-4">
-        <div className="max-w-5xl mx-auto space-y-12">
+        <div className="max-w-6xl mx-auto space-y-12">
 
           {/* Checkout error */}
           {checkoutError && (
@@ -62,37 +74,58 @@ export default function PricingPage() {
           <div className="text-center space-y-3">
             <h1 className="text-4xl font-bold text-gray-900">Simple pricing</h1>
             <p className="text-gray-500 max-w-lg mx-auto">
-              Start free. Upgrade when you need more. No hidden fees, cancel anytime.
+              Ten free extractions every month, just for signing in. Upgrade when you
+              need more. No hidden fees, cancel anytime.
             </p>
           </div>
 
+          {/* Sign-in nudge — only shown to signed-out visitors */}
+          {!signedIn && (
+            <div className="bg-brand-50 border border-brand-200 rounded-2xl p-5 text-center space-y-3 max-w-2xl mx-auto">
+              <p className="font-semibold text-brand-800">
+                Make sure you sign in to save! Don&apos;t lose your recipes!
+              </p>
+              <p className="text-sm text-brand-700">
+                You get 1 extraction without an account. Sign in and that becomes 10 a
+                month — and every recipe you extract stays in your account.
+              </p>
+              <Link href="/signup" className="btn-primary text-sm inline-block">
+                Sign up free
+              </Link>
+            </div>
+          )}
+
           {/* Pricing cards */}
-          <div className="grid sm:grid-cols-3 gap-6">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
 
             {/* Free */}
             <div className="bg-white border border-gray-100 shadow-sm rounded-2xl p-6 flex flex-col gap-6">
               <div>
-                <p className="font-semibold text-sm text-gray-500">Try it out</p>
-                <h2 className="text-2xl font-bold mt-1 text-gray-900">Free</h2>
+                <p className="font-semibold text-sm text-gray-500">{PLANS.FREE.tagline}</p>
+                <h2 className="text-2xl font-bold mt-1 text-gray-900">{PLANS.FREE.name}</h2>
                 <div className="flex items-end gap-1 mt-2">
-                  <span className="text-4xl font-bold text-gray-900">$0</span>
+                  <span className="text-4xl font-bold text-gray-900">{PLANS.FREE.price}</span>
+                  <span className="text-sm mb-1 text-gray-400">{PLANS.FREE.period}</span>
                 </div>
               </div>
-              <ul className="space-y-2 flex-1">
-                {["1 free extraction (no account required)", "Instant results"].map((f) => (
-                  <li key={f} className="flex items-start gap-2 text-sm">
-                    <span className="text-brand-500">✓</span>
-                    <span className="text-gray-600">{f}</span>
-                  </li>
-                ))}
-              </ul>
-              {currentTier === "FREE" ? (
+
+              <Features items={PLANS.FREE.features} tone="light" />
+
+              <p className="text-xs text-brand-700 bg-brand-50 border border-brand-100 rounded-lg px-3 py-2">
+                Make sure you sign in to save! Don&apos;t lose your recipes!
+              </p>
+
+              {currentTier === "FREE" && signedIn ? (
                 <div className="text-center text-sm font-medium rounded-xl py-2.5 bg-gray-100 text-gray-500">
                   Current plan
                 </div>
+              ) : signedIn ? (
+                <div className="text-center text-sm font-medium rounded-xl py-2.5 bg-gray-50 text-gray-400">
+                  Included in your plan
+                </div>
               ) : (
                 <Link href="/signup" className="text-center rounded-xl py-2.5 text-sm font-semibold bg-brand-500 text-white hover:bg-brand-600 transition-colors">
-                  Get started
+                  Get started free
                 </Link>
               )}
             </div>
@@ -100,26 +133,21 @@ export default function PricingPage() {
             {/* Premium */}
             <div className="relative bg-brand-500 rounded-2xl p-6 flex flex-col gap-6 shadow-xl shadow-brand-200">
               <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                <span className="bg-amber-400 text-amber-900 text-xs font-semibold px-3 py-1 rounded-full">
+                <span className="bg-amber-400 text-amber-900 text-xs font-semibold px-3 py-1 rounded-full whitespace-nowrap">
                   Most Popular
                 </span>
               </div>
               <div>
-                <p className="font-semibold text-sm text-brand-100">For regular cooks</p>
+                <p className="font-semibold text-sm text-brand-100">{PLANS.PREMIUM.tagline}</p>
                 <h2 className="text-2xl font-bold mt-1 text-white">{PLANS.PREMIUM.name}</h2>
                 <div className="flex items-end gap-1 mt-2">
                   <span className="text-4xl font-bold text-white">{PLANS.PREMIUM.price}</span>
-                  <span className="text-sm mb-1 text-brand-100">/month</span>
+                  <span className="text-sm mb-1 text-brand-100">{PLANS.PREMIUM.period}</span>
                 </div>
               </div>
-              <ul className="space-y-2 flex-1">
-                {PLANS.PREMIUM.features.map((f) => (
-                  <li key={f} className="flex items-start gap-2 text-sm">
-                    <span className="text-brand-200">✓</span>
-                    <span className="text-brand-50">{f}</span>
-                  </li>
-                ))}
-              </ul>
+
+              <Features items={PLANS.PREMIUM.features} tone="dark" />
+
               {currentTier === "PREMIUM" ? (
                 <div className="text-center text-sm font-medium rounded-xl py-2.5 bg-white/20 text-white">
                   Current plan
@@ -138,55 +166,15 @@ export default function PricingPage() {
             {/* Pro */}
             <div className="bg-white border border-gray-100 shadow-sm rounded-2xl p-6 flex flex-col gap-6">
               <div>
-                <p className="font-semibold text-sm text-gray-500">For power users</p>
+                <p className="font-semibold text-sm text-gray-500">{PLANS.PRO.tagline}</p>
                 <h2 className="text-2xl font-bold mt-1 text-gray-900">{PLANS.PRO.name}</h2>
-
-                {/* Monthly / Yearly toggle */}
-                <div className="flex items-center gap-2 mt-3">
-                  <button
-                    onClick={() => setProYearly(false)}
-                    className={`text-xs font-semibold px-3 py-1 rounded-full transition-colors ${
-                      !proYearly ? "bg-brand-500 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                    }`}
-                  >
-                    Monthly
-                  </button>
-                  <button
-                    onClick={() => setProYearly(true)}
-                    className={`text-xs font-semibold px-3 py-1 rounded-full transition-colors flex items-center gap-1.5 ${
-                      proYearly ? "bg-brand-500 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                    }`}
-                  >
-                    Yearly
-                    <span className={`text-xs font-bold ${proYearly ? "text-amber-300" : "text-green-600"}`}>
-                      Save 17%
-                    </span>
-                  </button>
-                </div>
-
                 <div className="flex items-end gap-1 mt-2">
-                  <span className="text-4xl font-bold text-gray-900">
-                    {proYearly ? "$99.99" : PLANS.PRO.price}
-                  </span>
-                  <span className="text-sm mb-1 text-gray-400">
-                    {proYearly ? "/year" : "/month"}
-                  </span>
+                  <span className="text-4xl font-bold text-gray-900">{PLANS.PRO.price}</span>
+                  <span className="text-sm mb-1 text-gray-400">{PLANS.PRO.period}</span>
                 </div>
-                {proYearly && (
-                  <p className="text-xs text-green-600 font-medium mt-1">
-                    That&apos;s $8.33/month — 2 months free!
-                  </p>
-                )}
               </div>
 
-              <ul className="space-y-2 flex-1">
-                {PLANS.PRO.features.map((f) => (
-                  <li key={f} className="flex items-start gap-2 text-sm">
-                    <span className="text-brand-500">✓</span>
-                    <span className="text-gray-600">{f}</span>
-                  </li>
-                ))}
-              </ul>
+              <Features items={PLANS.PRO.features} tone="light" />
 
               {currentTier === "PRO" ? (
                 <div className="text-center text-sm font-medium rounded-xl py-2.5 bg-gray-100 text-gray-500">
@@ -194,11 +182,54 @@ export default function PricingPage() {
                 </div>
               ) : (
                 <button
-                  onClick={() => handleUpgrade(proActivePriceId)}
-                  disabled={loadingPriceId === proActivePriceId}
+                  onClick={() => handleUpgrade(PLANS.PRO.priceId)}
+                  disabled={loadingPriceId === PLANS.PRO.priceId}
                   className="rounded-xl py-2.5 text-sm font-semibold bg-brand-500 text-white hover:bg-brand-600 transition-colors disabled:opacity-60"
                 >
-                  {loadingPriceId === proActivePriceId ? "Redirecting…" : `Upgrade to Pro`}
+                  {loadingPriceId === PLANS.PRO.priceId ? "Redirecting…" : "Upgrade to Pro"}
+                </button>
+              )}
+            </div>
+
+            {/* Lifetime */}
+            <div className="relative bg-gray-900 rounded-2xl p-6 flex flex-col gap-6 shadow-xl shadow-gray-300">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                <span className="bg-emerald-400 text-emerald-950 text-xs font-semibold px-3 py-1 rounded-full whitespace-nowrap">
+                  Best Value
+                </span>
+              </div>
+              <div>
+                <p className="font-semibold text-sm text-gray-400">{PLANS.LIFETIME.tagline}</p>
+                <h2 className="text-2xl font-bold mt-1 text-white">{PLANS.LIFETIME.name}</h2>
+                <div className="flex items-end gap-1 mt-2">
+                  <span className="text-4xl font-bold text-white">{PLANS.LIFETIME.price}</span>
+                  <span className="text-sm mb-1 text-gray-400">{PLANS.LIFETIME.period}</span>
+                </div>
+                <p className="text-xs text-emerald-400 font-medium mt-1">
+                  No subscription — pay once, use forever.
+                </p>
+              </div>
+
+              <ul className="space-y-2 flex-1">
+                {PLANS.LIFETIME.features.map((f) => (
+                  <li key={f} className="flex items-start gap-2 text-sm">
+                    <span className="text-emerald-400">✓</span>
+                    <span className="text-gray-300">{f}</span>
+                  </li>
+                ))}
+              </ul>
+
+              {currentTier === "LIFETIME" ? (
+                <div className="text-center text-sm font-medium rounded-xl py-2.5 bg-white/10 text-white">
+                  You own this
+                </div>
+              ) : (
+                <button
+                  onClick={() => handleUpgrade(PLANS.LIFETIME.priceId)}
+                  disabled={loadingPriceId === PLANS.LIFETIME.priceId}
+                  className="rounded-xl py-2.5 text-sm font-semibold bg-emerald-400 text-emerald-950 hover:bg-emerald-300 transition-colors disabled:opacity-60"
+                >
+                  {loadingPriceId === PLANS.LIFETIME.priceId ? "Redirecting…" : "Buy Lifetime"}
                 </button>
               )}
             </div>
@@ -210,16 +241,24 @@ export default function PricingPage() {
             <h2 className="text-xl font-bold text-gray-900 text-center">FAQ</h2>
             {[
               {
-                q: "Do I need a credit card for the free plan?",
-                a: "No. You can extract 1 recipe without even creating an account.",
+                q: "Do I need an account to try it?",
+                a: "No. You get 1 extraction without an account. Sign in — it's free — and you get 10 every month, plus your recipes are saved instead of disappearing when you close the tab.",
+              },
+              {
+                q: "Can I really save recipes on the free plan?",
+                a: "Yes. Saving is included free once you're signed in. Premium and Pro raise how many recipes you can extract each month, not whether you can keep them.",
               },
               {
                 q: "What counts as an extraction?",
                 a: "Each time you paste a URL and get a clean recipe result, that's one extraction. Your counter resets monthly.",
               },
               {
+                q: "What does Lifetime include?",
+                a: "Everything in Pro — unlimited extractions and every feature — for a single $50 payment. There's no renewal and nothing to cancel.",
+              },
+              {
                 q: "Can I cancel anytime?",
-                a: "Yes. Cancel from your billing dashboard with one click. Your plan stays active until the end of the billing period.",
+                a: "Yes. Cancel Premium or Pro from your billing dashboard with one click; your plan stays active until the end of the billing period. Lifetime has nothing to cancel.",
               },
               {
                 q: "What recipe sites are supported?",

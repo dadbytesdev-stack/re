@@ -1,11 +1,16 @@
 import { Tier } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
+/** Extractions allowed per month, per tier. Quoted to users in lib/stripe.ts. */
 export const TIER_LIMITS: Record<Tier, number> = {
-  FREE: 1,
-  PREMIUM: 10,
+  FREE: 10,
+  PREMIUM: 20,
   PRO: Infinity,
+  LIFETIME: Infinity,
 };
+
+/** Extractions a signed-out visitor gets before we ask them to sign in. */
+export const GUEST_LIMIT = 1;
 
 /**
  * Returns true if the user can make another extraction.
