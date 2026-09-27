@@ -17,7 +17,7 @@ export const PLANS = {
     price: "$0",
     period: "forever",
     features: [
-      "5 recipe extractions / month",
+      "10 recipe extractions / month",
       "Save recipes to your account",
       "Full recipe history",
     ],
@@ -31,7 +31,7 @@ export const PLANS = {
     mode: "subscription",
     priceId: process.env.NEXT_PUBLIC_STRIPE_PREMIUM_PRICE_ID ?? process.env.STRIPE_PREMIUM_MONTHLY_PRICE_ID ?? "",
     features: [
-      "100 recipe extractions / month",
+      "20 recipe extractions / month",
       "Save unlimited recipes",
       "Full recipe history",
     ],
@@ -54,11 +54,9 @@ export const PLANS = {
   LIFETIME: {
     name: "Lifetime",
     tagline: "Pay once, use forever",
-    // Must match the live Stripe price (price_1UINtu…, 4999). It read "$50"
-    // against a 4999 charge, which is a price the customer is never billed.
-    price: "$49.99",
+    price: "$50",
     period: "one-time",
-    priceOneTime: 4999,
+    priceOneTime: 5000,
     mode: "payment",
     priceId: process.env.NEXT_PUBLIC_STRIPE_LIFETIME_PRICE_ID ?? process.env.STRIPE_LIFETIME_PRICE_ID ?? "",
     features: [
