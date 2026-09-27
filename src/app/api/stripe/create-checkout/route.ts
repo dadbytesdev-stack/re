@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { stripe, LIFETIME_PRICE_IDS } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
+import { getAppUrl } from "@/lib/app-url";
 import { z } from "zod";
 
 const checkoutSchema = z.object({
@@ -24,7 +25,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { priceId } = result.data;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const appUrl = getAppUrl(req);
 
   try {
     // Get or create Stripe customer
