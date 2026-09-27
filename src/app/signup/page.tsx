@@ -1,12 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { isKnownPriceId, postAuthDestination } from "@/lib/checkout-intent";
 
-export default function SignupPage() {
+function SignupForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  /* /pricing sends the chosen plan and return path here so a purchase survives
+   * registration. Without them this falls back to the old /dashboard landing. */
+  const destination = postAuthDestination(searchParams);
+  const loginHref = `/login?callbackUrl=${encodeURIComponent(destination)}`;
+  const buyingPlan = isKnownPriceId(searchParams.get("priceId"));
+
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -51,11 +60,12 @@ export default function SignupPage() {
 
       if (result?.error) {
         setError("Account created! Please sign in.");
-        router.push("/login");
+        // Keep the destination so signing in still lands on checkout.
+        router.push(loginHref);
         return;
       }
 
-      router.push("/dashboard");
+      router.push(destination);
       router.refresh();
     } catch {
       setError("Network error. Please try again.");
@@ -74,7 +84,9 @@ export default function SignupPage() {
           </Link>
           <h1 className="mt-4 text-xl font-bold text-gray-900">Create your account</h1>
           <p className="text-sm text-gray-500 mt-1">
-            10 free extractions a month — no credit card required
+            {buyingPlan
+              ? "Last step before checkout — we'll take you straight to payment."
+              : "10 free extractions a month — no credit card required"}
           </p>
         </div>
 
@@ -138,14 +150,18 @@ export default function SignupPage() {
             </div>
 
             <button type="submit" className="btn-primary w-full" disabled={loading}>
-              {loading ? "Creating account…" : "Create free account"}
+              {loading
+                ? "Creating account…"
+                : buyingPlan
+                  ? "Create account & continue to checkout"
+                  : "Create free account"}
             </button>
           </form>
         </div>
 
         <p className="text-center text-sm text-gray-500">
           Already have an account?{" "}
-          <Link href="/login" className="text-brand-600 font-semibold hover:underline">
+          <Link href={loginHref} className="text-brand-600 font-semibold hover:underline">
             Sign in
           </Link>
         </p>
@@ -155,5 +171,13 @@ export default function SignupPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense>
+      <SignupForm />
+    </Suspense>
   );
 }
