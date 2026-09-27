@@ -1,10 +1,11 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Header } from "@/components/Header";
 import { PLANS } from "@/lib/stripe";
+import { isKnownPriceId, signupUrlForPrice } from "@/lib/checkout-intent";
 import Link from "next/link";
 
 function Features({ items, tone }: { items: readonly string[]; tone: "light" | "dark" }) {
@@ -20,39 +21,74 @@ function Features({ items, tone }: { items: readonly string[]; tone: "light" | "
   );
 }
 
-export default function PricingPage() {
-  const { data: session } = useSession();
+function PricingContent() {
+  const { data: session, status } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loadingPriceId, setLoadingPriceId] = useState<string | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
-  async function handleUpgrade(priceId: string) {
-    if (!session?.user) {
-      router.push("/signup");
-      return;
-    }
-
-    setLoadingPriceId(priceId);
-    setCheckoutError(null);
-
-    try {
-      const res = await fetch("/api/stripe/create-checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ priceId }),
-      });
-      const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        setCheckoutError(data.error ?? "Failed to start checkout. Please try again.");
+  const handleUpgrade = useCallback(
+    async (priceId: string) => {
+      // An unset NEXT_PUBLIC price id would otherwise post an empty string and
+      // come back as a bare "Invalid price ID".
+      if (!priceId) {
+        setCheckoutError(
+          "That plan isn't available right now. Please try again in a moment."
+        );
+        return;
       }
-    } catch {
-      setCheckoutError("Network error. Please check your connection and try again.");
-    } finally {
-      setLoadingPriceId(null);
-    }
-  }
+
+      /* A signed-out click still carries intent. Send the chosen plan and the
+       * return path into signup so checkout picks up where it left off, instead
+       * of dropping the person on /dashboard to start over. */
+      if (!session?.user) {
+        router.push(signupUrlForPrice(priceId));
+        return;
+      }
+
+      setLoadingPriceId(priceId);
+      setCheckoutError(null);
+
+      try {
+        const res = await fetch("/api/stripe/create-checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ priceId }),
+        });
+        const data = await res.json();
+        if (data.url) {
+          window.location.href = data.url;
+        } else {
+          setCheckoutError(data.error ?? "Failed to start checkout. Please try again.");
+        }
+      } catch {
+        setCheckoutError("Network error. Please check your connection and try again.");
+      } finally {
+        setLoadingPriceId(null);
+      }
+    },
+    [session, router]
+  );
+
+  /* Returning from /signup?callbackUrl=/pricing&priceId=… : open Stripe straight
+   * away rather than asking for the same click twice. Limited to a FREE account
+   * so a stale or shared link can never re-charge someone who already paid. */
+  const resumePriceId = searchParams.get("priceId");
+  const resumedRef = useRef(false);
+
+  useEffect(() => {
+    if (resumedRef.current) return;
+    if (status !== "authenticated") return;
+    if (!isKnownPriceId(resumePriceId)) return;
+    if ((session?.user?.tier ?? "FREE") !== "FREE") return;
+
+    resumedRef.current = true;
+    // Drop the parameter first so a refresh or a back-navigation does not open
+    // checkout a second time.
+    router.replace("/pricing", { scroll: false });
+    handleUpgrade(resumePriceId);
+  }, [status, session, resumePriceId, router, handleUpgrade]);
 
   const currentTier = session?.user?.tier ?? "FREE";
   const signedIn = Boolean(session?.user);
@@ -275,5 +311,13 @@ export default function PricingPage() {
         </div>
       </main>
     </>
+  );
+}
+
+export default function PricingPage() {
+  return (
+    <Suspense>
+      <PricingContent />
+    </Suspense>
   );
 }
