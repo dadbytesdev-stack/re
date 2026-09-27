@@ -1,21 +1,12 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { useState } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { isKnownPriceId, postAuthDestination } from "@/lib/checkout-intent";
 
-function SignupForm() {
+export default function SignupPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-
-  /* /pricing sends the chosen plan and return path here so a purchase survives
-   * registration. Without them this falls back to the old /dashboard landing. */
-  const destination = postAuthDestination(searchParams);
-  const loginHref = `/login?callbackUrl=${encodeURIComponent(destination)}`;
-  const buyingPlan = isKnownPriceId(searchParams.get("priceId"));
-
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -60,12 +51,11 @@ function SignupForm() {
 
       if (result?.error) {
         setError("Account created! Please sign in.");
-        // Keep the destination so signing in still lands on checkout.
-        router.push(loginHref);
+        router.push("/login");
         return;
       }
 
-      router.push(destination);
+      router.push("/dashboard");
       router.refresh();
     } catch {
       setError("Network error. Please try again.");
@@ -84,9 +74,7 @@ function SignupForm() {
           </Link>
           <h1 className="mt-4 text-xl font-bold text-gray-900">Create your account</h1>
           <p className="text-sm text-gray-500 mt-1">
-            {buyingPlan
-              ? "Last step before checkout — we'll take you straight to payment."
-              : "10 free extractions a month — no credit card required"}
+            10 free extractions a month — no credit card required
           </p>
         </div>
 
@@ -150,18 +138,14 @@ function SignupForm() {
             </div>
 
             <button type="submit" className="btn-primary w-full" disabled={loading}>
-              {loading
-                ? "Creating account…"
-                : buyingPlan
-                  ? "Create account & continue to checkout"
-                  : "Create free account"}
+              {loading ? "Creating account…" : "Create free account"}
             </button>
           </form>
         </div>
 
         <p className="text-center text-sm text-gray-500">
           Already have an account?{" "}
-          <Link href={loginHref} className="text-brand-600 font-semibold hover:underline">
+          <Link href="/login" className="text-brand-600 font-semibold hover:underline">
             Sign in
           </Link>
         </p>
@@ -171,13 +155,5 @@ function SignupForm() {
         </p>
       </div>
     </div>
-  );
-}
-
-export default function SignupPage() {
-  return (
-    <Suspense>
-      <SignupForm />
-    </Suspense>
   );
 }
