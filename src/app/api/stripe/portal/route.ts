@@ -3,8 +3,9 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { stripe } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
+import { getAppUrl } from "@/lib/app-url";
 
-export async function POST() {
+export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
 
   if (!session?.user) {
@@ -23,7 +24,7 @@ export async function POST() {
     );
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const appUrl = getAppUrl(req);
 
   const portalSession = await stripe.billingPortal.sessions.create({
     customer: user.stripeCustomerId,
