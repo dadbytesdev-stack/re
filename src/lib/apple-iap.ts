@@ -7,8 +7,13 @@
 //   2. Decode the payload (productId, expiresDate, revocationDate, env, etc.).
 //
 // Setup notes:
-//   - Set APPLE_BUNDLE_ID = "com.recipeextractor.app" (must match the
+//   - Set APPLE_BUNDLE_ID = "com.dadbytes.recipeextractor" (must match the
 //     bundle ID in your iOS Info.plist and App Store Connect).
+//   - Set APPLE_APP_ID to the app's numeric Apple ID (App Store Connect ->
+//     the app -> App Information -> "Apple ID", a 10-digit number). Apple's
+//     verifier refuses to check *Production* transactions without it, so
+//     without it every real App Store purchase fails verification while
+//     Sandbox (App Review, TestFlight) keeps working.
 //   - Download the two Apple root certs once from
 //     https://www.apple.com/certificateauthority/ and set them as
 //     base64-encoded env vars:
@@ -66,6 +71,25 @@ function peekEnvironment(jws: string): Environment {
   return Environment.SANDBOX;
 }
 
+/**
+ * The app's numeric Apple ID. SignedDataVerifier requires it for the
+ * Production environment and throws "appAppleId is required when the
+ * environment is Production" without it. Sandbox and Xcode ignore it.
+ */
+function appAppleIdFor(environment: Environment): number | undefined {
+  const raw = process.env.APPLE_APP_ID?.trim();
+  const id = raw ? Number(raw) : undefined;
+  if (id !== undefined && !Number.isSafeInteger(id)) {
+    throw new Error(`APPLE_APP_ID must be the app's numeric Apple ID, got "${raw}"`);
+  }
+  if (environment === Environment.PRODUCTION && id === undefined) {
+    throw new Error(
+      "APPLE_APP_ID env var is not set; it is required to verify live App Store purchases"
+    );
+  }
+  return id;
+}
+
 /** Base64-decode a JWS payload without verification. Used only for dev bypass. */
 function unsafeDecode(jws: string): JWSTransactionDecodedPayload {
   const parts = jws.split(".");
@@ -103,7 +127,8 @@ export async function verifyAppleTransaction(
       roots,
       false,
       environment,
-      bundleId
+      bundleId,
+      appAppleIdFor(environment)
     );
 
     payload = await verifier.verifyAndDecodeTransaction(signedTransaction);
@@ -178,7 +203,13 @@ export async function verifyAppleNotification(
       // fall back to PRODUCTION
     }
 
-    const verifier = new SignedDataVerifier(roots, false, env, bundleId);
+    const verifier = new SignedDataVerifier(
+      roots,
+      false,
+      env,
+      bundleId,
+      appAppleIdFor(env)
+    );
     notification = await verifier.verifyAndDecodeNotification(signedPayload);
   }
 
