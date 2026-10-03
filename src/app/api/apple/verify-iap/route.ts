@@ -6,7 +6,7 @@
 //   - productId: a sanity-check that the JWS matches what the iOS app
 //     thinks it just purchased.
 //
-// Response: { tier: "FREE" | "PREMIUM" | "PRO" }
+// Response: { tier: "FREE" | "PREMIUM" | "PRO" | "LIFETIME" }
 //
 // Side effects: updates the user's tier on success.
 //
@@ -21,18 +21,15 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/mobile-auth";
 import { verifyAppleTransaction } from "@/lib/apple-iap";
-import type { Tier } from "@prisma/client";
+import {
+  APPLE_PRODUCT_TO_TIER,
+  protectsLifetime,
+} from "@/lib/apple-products";
 
 const schema = z.object({
   signedTransaction: z.string().min(1),
   productId: z.string().min(1),
 });
-
-const PRODUCT_TO_TIER: Record<string, Tier> = {
-  "com.recipeextractor.premium.monthly": "PREMIUM",
-  "com.recipeextractor.pro.monthly": "PRO",
-  "com.recipeextractor.pro.yearly": "PRO",
-};
 
 export async function POST(req: NextRequest) {
   const user = await getAuthUser(req);
@@ -72,6 +69,14 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // 2b. A Lifetime user (bought on web/Android via Stripe, or earlier on
+  //     iOS) verifying some *other* product — e.g. an old subscription that
+  //     has since lapsed — must stay on LIFETIME. Don't touch their tier or
+  //     the transaction link the notifications route keys on.
+  if (protectsLifetime(user.tier, decoded.productId)) {
+    return NextResponse.json({ tier: "LIFETIME" });
+  }
+
   // 3. Revocation = refunded/family-removed. Drop them to FREE.
   if (decoded.revocationDate) {
     await prisma.user.update({
@@ -81,7 +86,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ tier: "FREE" });
   }
 
-  // 4. Expiry check for subscriptions. expiresDate is ms since epoch.
+  // 4. Expiry check for subscriptions (Lifetime has no expiresDate). expiresDate is ms since epoch.
   if (decoded.expiresDate && decoded.expiresDate < Date.now()) {
     await prisma.user.update({
       where: { id: user.id },
@@ -91,7 +96,7 @@ export async function POST(req: NextRequest) {
   }
 
   // 5. Map product to tier.
-  const tier = PRODUCT_TO_TIER[decoded.productId];
+  const tier = APPLE_PRODUCT_TO_TIER[decoded.productId];
   if (!tier) {
     console.error("[verify-iap] Unknown productId:", decoded.productId);
     return NextResponse.json(
@@ -103,7 +108,9 @@ export async function POST(req: NextRequest) {
   // 6. Persist tier + the originalTransactionId so server-to-server
   //    notifications (renewals, refunds, cancellations) can find this user
   //    later. originalTransactionId is stable across all renewals in the
-  //    subscription group, so it's the right id to key on.
+  //    subscription group, so it's the right id to key on. For the Lifetime
+  //    non-consumable it is the purchase itself, so a later refund of it
+  //    still finds this user.
   await prisma.user.update({
     where: { id: user.id },
     data: {

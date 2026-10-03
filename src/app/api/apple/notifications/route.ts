@@ -18,13 +18,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyAppleNotification } from "@/lib/apple-iap";
-import type { Tier } from "@prisma/client";
-
-const PRODUCT_TO_TIER: Record<string, Tier> = {
-  "com.recipeextractor.premium.monthly": "PREMIUM",
-  "com.recipeextractor.pro.monthly": "PRO",
-  "com.recipeextractor.pro.yearly": "PRO",
-};
+import {
+  APPLE_PRODUCT_TO_TIER,
+  protectsLifetime,
+} from "@/lib/apple-products";
 
 // Notification types that result in the user losing paid access.
 const REVOKE_TYPES = new Set([
@@ -113,6 +110,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ received: true });
   }
 
+  // 5. Lifetime is permanent. Only an event on the Apple Lifetime product
+  //    itself (a REFUND / REVOKE of it) may change a Lifetime user's tier —
+  //    a subscription of theirs expiring or renewing must not.
+  if (protectsLifetime(user.tier, transaction.productId)) {
+    return NextResponse.json({ received: true });
+  }
+
   try {
     if (REVOKE_TYPES.has(String(type))) {
       await prisma.user.update({
@@ -123,7 +127,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (GRANT_TYPES.has(String(type))) {
-      const newTier = PRODUCT_TO_TIER[transaction.productId];
+      const newTier = APPLE_PRODUCT_TO_TIER[transaction.productId];
       if (!newTier) {
         console.warn(
           "[apple/notifications] Unknown productId on grant:",
